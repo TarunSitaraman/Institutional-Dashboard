@@ -110,8 +110,7 @@ async function loadPivots(forceRefresh) {
   if (tsEl) tsEl.textContent = 'Pivots calculated at market open · ' + today;
 }
 
-// Load pivots on startup — defer slightly so watchlistState is populated
-setTimeout(function() { loadPivots(); }, 100);
+// loadPivots() is called from watchlist.js after DOM rows are rendered
 
 // Schedule a daily check: refresh when the calendar date changes
 (function scheduleDailyPivotRefresh() {

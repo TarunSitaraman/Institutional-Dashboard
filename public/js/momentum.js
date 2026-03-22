@@ -136,7 +136,7 @@ async function loadMomentumData() {
 }
 
 /* ── Scheduling ── */
-loadMomentumData();
+// Initial call handled by watchlist.js after DOM rows are rendered
 
 // During market hours: refresh OHLC every 60s (price data changes intraday)
 // Outside hours: refresh every 15 min (just momentum, which is EOD anyway)

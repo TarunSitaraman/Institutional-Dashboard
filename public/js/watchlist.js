@@ -207,6 +207,9 @@ function onSearchInput(e) {
 /* ── Init ── */
 document.addEventListener('DOMContentLoaded', function() {
   renderBothTables();
+  // Trigger pivot + momentum load after DOM rows exist
+  if (typeof loadPivots === 'function') loadPivots(true);
+  if (typeof loadMomentumData === 'function') loadMomentumData();
 
   // Wire input
   var input = document.getElementById('wl-input');
