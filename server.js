@@ -442,48 +442,55 @@ function calcVolumeScore(volumes) {
 
 function calcMomentumScore(closes, highs, lows, volumes) {
   const scores = {};
+  const curr = closes[closes.length - 1];
 
-  // RSI (weight 20) — normalize: RSI 70+ = bullish 80-100, RSI 30- = bearish 0-20
+  // RSI (weight 20) — stretch: RSI maps to score with steeper slope around 50
+  // RSI 50 → 50, RSI 60 → 65, RSI 40 → 35, RSI 70 → 82, RSI 30 → 18
   const rsi = calcRSI(closes);
-  scores.rsi = rsi != null ? Math.min(100, Math.max(0, rsi)) : 50;
+  if (rsi != null) {
+    const rsiNorm = (rsi - 50) * 1.6 + 50; // steeper slope
+    scores.rsi = Math.min(100, Math.max(0, rsiNorm));
+  } else { scores.rsi = 50; }
 
-  // MACD (weight 15) — hist > 0 = bullish
+  // MACD (weight 15) — use pct of price to normalize, then scale moderately
   const macd = calcMACD(closes);
-  scores.macd = macd != null
-    ? (macd.hist > 0 ? Math.min(100, 50 + Math.abs(macd.hist / closes[closes.length-1]) * 5000) : Math.max(0, 50 - Math.abs(macd.hist / closes[closes.length-1]) * 5000))
-    : 50;
+  if (macd != null) {
+    const histPct = (macd.hist / curr) * 1000; // e.g. 0.1% diff → 0.1 unit
+    scores.macd = Math.min(100, Math.max(0, 50 + histPct * 12));
+  } else { scores.macd = 50; }
 
-  // ADX (weight 15) — strong trend + direction
+  // ADX (weight 15) — direction-weighted by +DI/-DI ratio
   const adx = calcADX(highs, lows, closes);
   if (adx != null) {
-    const trendStrength = Math.min(100, adx.adx * 2); // ADX 50 = max strength
-    scores.adx = adx.pdi > adx.mdi
-      ? 50 + trendStrength / 2   // bullish trend
-      : 50 - trendStrength / 2;  // bearish trend
+    const diRatio = (adx.pdi - adx.mdi) / (adx.pdi + adx.mdi + 0.001); // -1 to +1
+    const trendConf = Math.min(1, adx.adx / 40); // ADX 40+ = full confidence
+    scores.adx = Math.min(100, Math.max(0, 50 + diRatio * trendConf * 45));
   } else { scores.adx = 50; }
 
-  // Price vs SMA20 (weight 10)
+  // Price vs SMA20 (weight 10) — ±3% range maps to 0-100
   const sma20 = calcSMA(closes, 20);
-  const curr  = closes[closes.length - 1];
   scores.sma20 = sma20 != null
-    ? Math.min(100, Math.max(0, 50 + ((curr - sma20) / sma20) * 500))
+    ? Math.min(100, Math.max(0, 50 + ((curr - sma20) / sma20) * 1200))
     : 50;
 
-  // Price vs SMA50 (weight 10)
+  // Price vs SMA50 (weight 10) — ±5% range maps to 0-100
   const sma50 = calcSMA(closes, 50);
   scores.sma50 = sma50 != null
-    ? Math.min(100, Math.max(0, 50 + ((curr - sma50) / sma50) * 300))
+    ? Math.min(100, Math.max(0, 50 + ((curr - sma50) / sma50) * 700))
     : 50;
 
-  // Price vs SMA200 (weight 10)
+  // Price vs SMA200 (weight 10) — ±10% range maps to 0-100
   const sma200 = calcSMA(closes, 200);
   scores.sma200 = sma200 != null
-    ? Math.min(100, Math.max(0, 50 + ((curr - sma200) / sma200) * 200))
+    ? Math.min(100, Math.max(0, 50 + ((curr - sma200) / sma200) * 350))
     : 50;
 
-  // 52-week position (weight 10)
+  // 52-week position (weight 10) — sigmoid-like: mid-range scores ~45-55
   const pos52 = calc52WeekPosition(closes);
-  scores.week52 = pos52 != null ? pos52 * 100 : 50;
+  if (pos52 != null) {
+    // Linear 0-100 but with slight center pull: values near 0.5 hover ~45-55
+    scores.week52 = Math.min(100, Math.max(0, pos52 * 90 + 5));
+  } else { scores.week52 = 50; }
 
   // Volume trend (weight 10)
   scores.volume = calcVolumeScore(volumes);
@@ -502,9 +509,8 @@ function calcMomentumScore(closes, highs, lows, volumes) {
   const score = Math.round(total * 10) / 10;
 
   let label;
-  if      (score >= 71) label = 'Technically Bullish';
-  else if (score >= 51) label = 'Technically Neutral';
-  else if (score >= 31) label = 'Technically Neutral';
+  if      (score >= 65) label = 'Technically Bullish';
+  else if (score >= 35) label = 'Technically Neutral';
   else                  label = 'Technically Bearish';
 
   return { score, label, components: scores };
