@@ -160,6 +160,23 @@
     gap: 8px;
   }
 
+  .logout-btn {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-subtle);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .logout-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
   /* ── THEME TOGGLE ── */
   .theme-toggle {
     display: flex;
