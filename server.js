@@ -255,7 +255,8 @@ app.get('/api/quote/:symbol', async (req, res) => {
     const price     = meta.regularMarketPrice;
     const prev      = meta.previousClose || meta.chartPreviousClose;
     const changePct = (prev && prev !== 0) ? (price - prev) / prev : null;
-    return res.json({ price, changePct, source: 'Yahoo Finance' });
+    const change    = (prev != null) ? (price - prev) : null;
+    return res.json({ price, change, changePct, source: 'Yahoo Finance' });
   } catch (e) {
     console.error(`[yf/quote] ${symbol}:`, e.message);
     return res.json({ error: true });
@@ -275,6 +276,7 @@ app.get('/api/nse/indices', async (req, res) => {
       if (!item) return null;
       return {
         price:     item.last,
+        change:    item.last - item.previousClose,
         changePct: item.percentChange / 100,
         open:      item.open,
         high:      item.high,

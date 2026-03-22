@@ -92,7 +92,9 @@ function updateIndexRow(priceId, chgId, data, decimals) {
   flashEl(pe, data.price, priceCache[priceId]);
   priceCache[priceId] = data.price;
   pe.textContent = fmt(data.price, decimals);
-  ce.textContent = fmtPct(data.changePct);
+  var pts = data.change != null ? (data.change >= 0 ? '+' : '') + fmt(data.change, decimals) : null;
+  var pct = fmtPct(data.changePct);
+  ce.textContent = pts ? pts + '  (' + pct + ')' : pct;
   setChgClass(ce, data.changePct);
 }
 
