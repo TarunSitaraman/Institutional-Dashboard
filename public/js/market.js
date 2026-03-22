@@ -135,8 +135,8 @@ async function refreshMarketData() {
     fetchNSEIndices(),       // Nifty 50 + Bank Nifty + VIX — NSE India official
     fetchQuote('^BSESN'),    // Sensex — Yahoo/BSE (no free BSE API)
     Promise.resolve(null),   // USD-INR now handled by forex.js
-    fetchQuote('BZ=F'),      // Brent crude
-    fetchQuote('CL=F'),      // WTI crude
+    Promise.resolve(null),   // Brent — handled by commodities.js
+    Promise.resolve(null),   // WTI   — handled by commodities.js
   ]);
 
   var sp500     = results[0];
@@ -145,8 +145,6 @@ async function refreshMarketData() {
   var giftNifty = results[3];
   var nseIdx    = results[4];
   var bsesn     = results[5];
-  var brent     = results[7];
-  var wti       = results[8];
 
   var nifty50   = nseIdx ? nseIdx.nifty50   : null;
   var niftyBank = nseIdx ? nseIdx.niftyBank : null;
@@ -176,9 +174,7 @@ async function refreshMarketData() {
 
   // CHUNK 4 — Forex handled by forex.js
 
-  // Commodities (Yahoo Finance, ~15 min)
-  updateCommodity('brent-price', 'brent-chg', 'brent-bar', brent);
-  updateCommodity('wti-price',   'wti-chg',   'wti-bar',   wti);
+  // Commodities handled by commodities.js
 
   // Timestamp
   var ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });

@@ -183,24 +183,31 @@
     <div class="section-label">Energy &amp; Commodities</div>
     <div class="commodities-card">
       <span class="material-symbols-outlined commodities-bg-icon">oil_barrel</span>
-      <div class="commodities-title">Energy &amp; Commodities</div>
-      <div class="commodities-grid">
-        <div>
-          <div class="commodity-name">Crude Brent</div>
-          <div class="commodity-price-row">
-            <span class="commodity-price" id="brent-price">—</span>
-            <span class="commodity-chg" id="brent-chg">—</span>
-          </div>
-          <div class="commodity-bar"><div class="commodity-bar-fill" id="brent-bar"></div></div>
+      <div class="commodities-header">
+        <div class="commodities-title">Energy &amp; Commodities</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-sm btn-add" onclick="openCommModal('add')">
+            <span class="material-symbols-outlined" style="font-size:13px;">add</span>
+          </button>
+          <button class="btn-sm btn-remove" onclick="openCommModal('remove')">
+            <span class="material-symbols-outlined" style="font-size:13px;">remove</span>
+          </button>
         </div>
-        <div>
-          <div class="commodity-name">Nymex WTI</div>
-          <div class="commodity-price-row">
-            <span class="commodity-price" id="wti-price">—</span>
-            <span class="commodity-chg" id="wti-chg">—</span>
-          </div>
-          <div class="commodity-bar"><div class="commodity-bar-fill" id="wti-bar"></div></div>
+      </div>
+      <div class="commodities-grid" id="commodities-grid"></div>
+    </div>
+
+    <!-- Commodities Modal -->
+    <div class="wl-modal" id="comm-modal" style="display:none;">
+      <div class="wl-modal-box">
+        <div class="wl-modal-header">
+          <div class="wl-modal-title" id="comm-modal-title">Add Commodity</div>
+          <button class="wl-modal-close" onclick="closeCommModal()">
+            <span class="material-symbols-outlined">close</span>
+          </button>
         </div>
+        <div id="comm-add-list"></div>
+        <div id="comm-remove-list"></div>
       </div>
     </div>
 
@@ -340,6 +347,7 @@
   }
 </script>
 <script src="/js/forex.js" defer></script>
+<script src="/js/commodities.js" defer></script>
 <script src="/js/watchlist.js" defer></script>
 <script src="/js/theme.js" defer></script>
 <script src="/js/market.js" defer></script>

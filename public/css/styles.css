@@ -694,6 +694,16 @@
     pointer-events: none;
     font-variation-settings: 'FILL' 1;
   }
+  .commodities-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .commodities-header .commodities-title { margin-bottom: 0; }
+  .commodity-unit { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+  .commodity-item { display: flex; flex-direction: column; gap: 4px; }
+
   .commodities-title {
     font-family: var(--mono);
     font-size: 11px;
