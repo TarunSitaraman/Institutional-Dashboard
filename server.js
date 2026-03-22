@@ -436,61 +436,59 @@ function calcVolumeScore(volumes) {
   const avgVol = volumes.slice(-20, -1).reduce((a, b) => a + b, 0) / 19;
   const lastVol = volumes[volumes.length - 1];
   const ratio = lastVol / avgVol;
-  // ratio > 1.5 = strong volume, score 70-90; ratio < 0.5 = weak, score 20-40
-  return Math.min(100, Math.max(0, 50 + (ratio - 1) * 30));
+  // ratio > 1.5 = above avg volume, score 60-70; ratio < 0.5 = weak, 35-45
+  return Math.min(70, Math.max(30, 50 + (ratio - 1) * 20));
 }
 
 function calcMomentumScore(closes, highs, lows, volumes) {
   const scores = {};
   const curr = closes[closes.length - 1];
 
-  // RSI (weight 20) — stretch: RSI maps to score with steeper slope around 50
-  // RSI 50 → 50, RSI 60 → 65, RSI 40 → 35, RSI 70 → 82, RSI 30 → 18
+  // RSI (weight 20) — mild stretch: RSI 50→50, RSI 30→26, RSI 70→74
   const rsi = calcRSI(closes);
   if (rsi != null) {
-    const rsiNorm = (rsi - 50) * 1.6 + 50; // steeper slope
+    const rsiNorm = (rsi - 50) * 1.2 + 50;
     scores.rsi = Math.min(100, Math.max(0, rsiNorm));
   } else { scores.rsi = 50; }
 
-  // MACD (weight 15) — use pct of price to normalize, then scale moderately
+  // MACD (weight 15) — use pct of price to normalize, floor/ceil at 20/80
   const macd = calcMACD(closes);
   if (macd != null) {
-    const histPct = (macd.hist / curr) * 1000; // e.g. 0.1% diff → 0.1 unit
-    scores.macd = Math.min(100, Math.max(0, 50 + histPct * 12));
+    const histPct = (macd.hist / curr) * 1000;
+    scores.macd = Math.min(80, Math.max(20, 50 + histPct * 10));
   } else { scores.macd = 50; }
 
-  // ADX (weight 15) — direction-weighted by +DI/-DI ratio
+  // ADX (weight 15) — direction-weighted by +DI/-DI ratio, floor at 20
   const adx = calcADX(highs, lows, closes);
   if (adx != null) {
     const diRatio = (adx.pdi - adx.mdi) / (adx.pdi + adx.mdi + 0.001); // -1 to +1
     const trendConf = Math.min(1, adx.adx / 40); // ADX 40+ = full confidence
-    scores.adx = Math.min(100, Math.max(0, 50 + diRatio * trendConf * 45));
+    scores.adx = Math.min(80, Math.max(20, 50 + diRatio * trendConf * 30));
   } else { scores.adx = 50; }
 
-  // Price vs SMA20 (weight 10) — ±3% range maps to 0-100
+  // Price vs SMA20 (weight 10) — ±5% range maps to 20-80
   const sma20 = calcSMA(closes, 20);
   scores.sma20 = sma20 != null
-    ? Math.min(100, Math.max(0, 50 + ((curr - sma20) / sma20) * 1200))
+    ? Math.min(80, Math.max(20, 50 + ((curr - sma20) / sma20) * 600))
     : 50;
 
-  // Price vs SMA50 (weight 10) — ±5% range maps to 0-100
+  // Price vs SMA50 (weight 10) — ±8% range maps to 20-80
   const sma50 = calcSMA(closes, 50);
   scores.sma50 = sma50 != null
-    ? Math.min(100, Math.max(0, 50 + ((curr - sma50) / sma50) * 700))
+    ? Math.min(80, Math.max(20, 50 + ((curr - sma50) / sma50) * 375))
     : 50;
 
-  // Price vs SMA200 (weight 10) — ±10% range maps to 0-100
+  // Price vs SMA200 (weight 10) — ±15% range maps to 20-80
   const sma200 = calcSMA(closes, 200);
   scores.sma200 = sma200 != null
-    ? Math.min(100, Math.max(0, 50 + ((curr - sma200) / sma200) * 350))
+    ? Math.min(80, Math.max(20, 50 + ((curr - sma200) / sma200) * 200))
     : 50;
 
-  // 52-week position (weight 10) — sigmoid-like: mid-range scores ~45-55
+  // 52-week position (weight 10) — compress to 20-80 range
   const pos52 = calc52WeekPosition(closes);
-  if (pos52 != null) {
-    // Linear 0-100 but with slight center pull: values near 0.5 hover ~45-55
-    scores.week52 = Math.min(100, Math.max(0, pos52 * 90 + 5));
-  } else { scores.week52 = 50; }
+  scores.week52 = pos52 != null
+    ? Math.min(80, Math.max(20, pos52 * 60 + 20))
+    : 50;
 
   // Volume trend (weight 10)
   scores.volume = calcVolumeScore(volumes);
@@ -506,11 +504,14 @@ function calcMomentumScore(closes, highs, lows, volumes) {
     scores.week52 * 0.10 +
     scores.volume * 0.10;
 
-  const score = Math.round(total * 10) / 10;
+  // Components already floored at 20-30, so raw total sits in ~25-75 range
+  // Apply a mild final compression to align with Trendlyne's output range
+  const compressed = total * 0.75 + 12;
+  const score = Math.round(compressed * 10) / 10;
 
   let label;
-  if      (score >= 65) label = 'Technically Bullish';
-  else if (score >= 35) label = 'Technically Neutral';
+  if      (score >= 55) label = 'Technically Bullish';
+  else if (score >= 38) label = 'Technically Neutral';
   else                  label = 'Technically Bearish';
 
   return { score, label, components: scores };
