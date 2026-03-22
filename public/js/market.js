@@ -132,7 +132,7 @@ async function refreshMarketData() {
     fetchGiftNifty(),        // Gift Nifty — NSE India official
     fetchNSEIndices(),       // Nifty 50 + Bank Nifty + VIX — NSE India official
     fetchQuote('^BSESN'),    // Sensex — Yahoo/BSE (no free BSE API)
-    fetchQuote('USDINR=X'),  // USD-INR — Yahoo forex (near-realtime)
+    Promise.resolve(null),   // USD-INR now handled by forex.js
     fetchQuote('BZ=F'),      // Brent crude
     fetchQuote('CL=F'),      // WTI crude
   ]);
@@ -143,7 +143,6 @@ async function refreshMarketData() {
   var giftNifty = results[3];
   var nseIdx    = results[4];
   var bsesn     = results[5];
-  var usdinr    = results[6];
   var brent     = results[7];
   var wti       = results[8];
 
@@ -173,9 +172,7 @@ async function refreshMarketData() {
   updateIndexRow('banknifty-price', 'banknifty-chg', niftyBank, 2);
   updateIndexRow('sensex-price',    'sensex-chg',    bsesn,     2);
 
-  // CHUNK 4 — USD-INR (Yahoo Finance forex, near-realtime)
-  updateCurrencyCard('usdinr-price', 'usdinr-chg', usdinr);
-  setSource('source-usdinr', 'Yahoo Finance · Forex · Near Realtime');
+  // CHUNK 4 — Forex handled by forex.js
 
   // Commodities (Yahoo Finance, ~15 min)
   updateCommodity('brent-price', 'brent-chg', 'brent-bar', brent);

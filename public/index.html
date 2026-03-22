@@ -146,18 +146,35 @@
         <div class="card-source">NSE India · Official · Sensex: Yahoo Finance</div>
       </div>
 
-      <!-- CHUNK 4: USD-INR -->
+      <!-- CHUNK 4: Forex -->
       <div class="card card-currency">
-        <div class="card-tag">
-          Currency
-          <span class="material-symbols-outlined">swap_horiz</span>
+        <div class="card-tag" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Currency <span class="material-symbols-outlined">swap_horiz</span></span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-sm btn-add" onclick="openForexModal('add')" style="padding:3px 8px;font-size:11px;">
+              <span class="material-symbols-outlined" style="font-size:13px;">add</span>
+            </button>
+            <button class="btn-sm btn-remove" onclick="openForexModal('remove')" style="padding:3px 8px;font-size:11px;">
+              <span class="material-symbols-outlined" style="font-size:13px;">remove</span>
+            </button>
+          </div>
         </div>
-        <div class="currency-pair">USD / INR</div>
-        <div class="currency-rate" id="usdinr-price">—</div>
-        <div class="idx-chg" id="usdinr-chg">
-          <span class="material-symbols-outlined">remove</span>—
+        <div class="indices-stack" id="forex-stack"></div>
+        <div class="card-source">Yahoo Finance · Forex · Near Realtime</div>
+      </div>
+
+      <!-- Forex Modal -->
+      <div class="wl-modal" id="forex-modal" style="display:none;">
+        <div class="wl-modal-box">
+          <div class="wl-modal-header">
+            <div class="wl-modal-title" id="forex-modal-title">Add Currency Pair</div>
+            <button class="wl-modal-close" onclick="closeForexModal()">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div id="forex-add-list"></div>
+          <div id="forex-remove-list"></div>
         </div>
-        <div class="card-source" id="source-usdinr">—</div>
       </div>
 
     </div>
@@ -322,6 +339,7 @@
     window.location.href = '/login.html';
   }
 </script>
+<script src="/js/forex.js" defer></script>
 <script src="/js/watchlist.js" defer></script>
 <script src="/js/theme.js" defer></script>
 <script src="/js/market.js" defer></script>

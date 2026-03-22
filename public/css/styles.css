@@ -1441,6 +1441,22 @@
   .flash-up   { animation: flashUp   0.6s ease; }
   .flash-down { animation: flashDown 0.6s ease; }
 
+  /* ── FOREX MODAL ITEMS ── */
+  .forex-pair-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .forex-pair-item:last-child { border-bottom: none; }
+  .forex-pair-item:hover { background: var(--bg-sidebar); }
+  .forex-pair-label { font-size: 14px; font-weight: 500; color: var(--text-primary); font-family: var(--mono); }
+  .forex-pair-add { font-size: 18px; color: var(--green); font-weight: 700; }
+  .forex-pair-remove { font-size: 18px; color: var(--red); font-weight: 700; }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 1200px) {
     aside.news-sidebar { display: none; }
