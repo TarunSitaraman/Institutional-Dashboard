@@ -126,6 +126,8 @@
       font-size: 14px;
       color: var(--text-subtle);
       max-width: 380px;
+      margin-left: auto;
+      margin-right: auto;
       line-height: 1.6;
     }
 
@@ -419,11 +421,11 @@
         if (dark) {
           html.classList.add('dark');
           icon.innerHTML = '<path d="' + SUN + '"/>';
-          label.textContent = 'Light';
+          label.textContent = 'Dark';
         } else {
           html.classList.remove('dark');
           icon.innerHTML = '<path d="' + MOON + '"/>';
-          label.textContent = 'Dark';
+          label.textContent = 'Light';
         }
         localStorage.setItem('sn-theme', dark ? 'dark' : 'light');
       }
