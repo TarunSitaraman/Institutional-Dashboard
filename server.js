@@ -504,9 +504,9 @@ function calcMomentumScore(closes, highs, lows, volumes) {
     scores.week52 * 0.10 +
     scores.volume * 0.10;
 
-  // Components already floored at 20-30, so raw total sits in ~25-75 range
-  // Apply a mild final compression to align with Trendlyne's output range
-  const compressed = total * 0.75 + 12;
+  // Components already floored at 20-30, so raw total sits in ~25-70 range
+  // Linear map: raw 25→33, raw 50→55, raw 65→67 matches Trendlyne observations
+  const compressed = total * 0.85 + 12;
   const score = Math.round(compressed * 10) / 10;
 
   let label;
