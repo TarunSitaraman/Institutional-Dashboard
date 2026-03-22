@@ -85,10 +85,10 @@
   .shell {
     display: grid;
     grid-template-rows: 52px 1fr;
-    grid-template-columns: 220px 1fr 300px;
+    grid-template-columns: 1fr 300px;
     grid-template-areas:
-      "header header header"
-      "sidebar main   news";
+      "header header"
+      "main   news";
     height: 100vh;
     overflow: hidden;
   }
@@ -1426,15 +1426,11 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 1200px) {
-    .shell {
-      grid-template-columns: 200px 1fr 260px;
-    }
     aside.news-sidebar { display: none; }
-    .shell { grid-template-columns: 200px 1fr; grid-template-areas: "header header" "sidebar main"; }
+    .shell { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
   }
   @media (max-width: 768px) {
     .shell { grid-template-areas: "header" "main"; grid-template-columns: 1fr; grid-template-rows: 52px 1fr; }
-    aside.sidebar { display: none; }
     .market-grid { grid-template-columns: 1fr 1fr; }
     .card-futures, .card-gift, .card-indices, .card-currency { grid-column: span 1; }
   }
