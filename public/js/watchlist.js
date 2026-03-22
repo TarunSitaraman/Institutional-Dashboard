@@ -4,11 +4,7 @@
    Persisted to localStorage under 'sn-watchlist-v1'
 ════════════════════════════════════════════════════ */
 
-var DEFAULT_WATCHLIST = [
-  { symbol: 'CHOLAFIN',   name: 'Chola Finance'   },
-  { symbol: 'SHRIRAMFIN', name: 'Shriram Finance'  },
-  { symbol: 'HDFCAMC',    name: 'HDFC AMC'         },
-];
+var DEFAULT_WATCHLIST = [];
 
 var WL_KEY = 'sn-watchlist-v1';
 
