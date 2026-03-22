@@ -355,6 +355,214 @@ app.get('/api/ohlc/:symbol', async (req, res) => {
   }
 });
 
+// ── Momentum calculation helpers ──────────────────────────────────────────────
+
+function calcSMA(closes, period) {
+  if (closes.length < period) return null;
+  const slice = closes.slice(-period);
+  return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+function calcEMA(closes, period) {
+  if (closes.length < period) return null;
+  const k = 2 / (period + 1);
+  let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < closes.length; i++) {
+    ema = closes[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function calcRSI(closes, period = 14) {
+  if (closes.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  if (losses === 0) return 100;
+  const rs = (gains / period) / (losses / period);
+  return 100 - (100 / (1 + rs));
+}
+
+function calcMACD(closes) {
+  const ema12 = calcEMA(closes, 12);
+  const ema26 = calcEMA(closes, 26);
+  if (ema12 == null || ema26 == null) return null;
+  const macdLine = ema12 - ema26;
+  // Signal line = 9-period EMA of MACD — approximate with last 9 MACD values
+  const macdValues = [];
+  for (let i = Math.max(26, closes.length - 35); i <= closes.length; i++) {
+    const slice = closes.slice(0, i);
+    const e12 = calcEMA(slice, 12);
+    const e26 = calcEMA(slice, 26);
+    if (e12 != null && e26 != null) macdValues.push(e12 - e26);
+  }
+  const signalLine = macdValues.length >= 9
+    ? calcEMA(macdValues, 9)
+    : macdValues[macdValues.length - 1];
+  return { macd: macdLine, signal: signalLine, hist: macdLine - (signalLine || 0) };
+}
+
+function calcADX(highs, lows, closes, period = 14) {
+  if (closes.length < period + 1) return null;
+  const trueRanges = [], dmPlus = [], dmMinus = [];
+  for (let i = 1; i < closes.length; i++) {
+    const h = highs[i], l = lows[i], pc = closes[i - 1];
+    trueRanges.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+    dmPlus.push(Math.max(highs[i] - highs[i - 1], 0) > Math.max(lows[i - 1] - lows[i], 0)
+      ? Math.max(highs[i] - highs[i - 1], 0) : 0);
+    dmMinus.push(Math.max(lows[i - 1] - lows[i], 0) > Math.max(highs[i] - highs[i - 1], 0)
+      ? Math.max(lows[i - 1] - lows[i], 0) : 0);
+  }
+  const atr  = trueRanges.slice(-period).reduce((a, b) => a + b, 0) / period;
+  const pDI  = (dmPlus.slice(-period).reduce((a, b) => a + b, 0) / period) / atr * 100;
+  const mDI  = (dmMinus.slice(-period).reduce((a, b) => a + b, 0) / period) / atr * 100;
+  const dx   = Math.abs(pDI - mDI) / (pDI + mDI) * 100;
+  return { adx: dx, pdi: pDI, mdi: mDI };
+}
+
+function calc52WeekPosition(closes) {
+  if (closes.length < 52) return null;
+  const slice = closes.slice(-252);
+  const high52 = Math.max(...slice);
+  const low52  = Math.min(...slice);
+  const curr   = closes[closes.length - 1];
+  return (curr - low52) / (high52 - low52); // 0 = at 52wk low, 1 = at 52wk high
+}
+
+function calcVolumeScore(volumes) {
+  if (volumes.length < 20) return 50;
+  const avgVol = volumes.slice(-20, -1).reduce((a, b) => a + b, 0) / 19;
+  const lastVol = volumes[volumes.length - 1];
+  const ratio = lastVol / avgVol;
+  // ratio > 1.5 = strong volume, score 70-90; ratio < 0.5 = weak, score 20-40
+  return Math.min(100, Math.max(0, 50 + (ratio - 1) * 30));
+}
+
+function calcMomentumScore(closes, highs, lows, volumes) {
+  const scores = {};
+
+  // RSI (weight 20) — normalize: RSI 70+ = bullish 80-100, RSI 30- = bearish 0-20
+  const rsi = calcRSI(closes);
+  scores.rsi = rsi != null ? Math.min(100, Math.max(0, rsi)) : 50;
+
+  // MACD (weight 15) — hist > 0 = bullish
+  const macd = calcMACD(closes);
+  scores.macd = macd != null
+    ? (macd.hist > 0 ? Math.min(100, 50 + Math.abs(macd.hist / closes[closes.length-1]) * 5000) : Math.max(0, 50 - Math.abs(macd.hist / closes[closes.length-1]) * 5000))
+    : 50;
+
+  // ADX (weight 15) — strong trend + direction
+  const adx = calcADX(highs, lows, closes);
+  if (adx != null) {
+    const trendStrength = Math.min(100, adx.adx * 2); // ADX 50 = max strength
+    scores.adx = adx.pdi > adx.mdi
+      ? 50 + trendStrength / 2   // bullish trend
+      : 50 - trendStrength / 2;  // bearish trend
+  } else { scores.adx = 50; }
+
+  // Price vs SMA20 (weight 10)
+  const sma20 = calcSMA(closes, 20);
+  const curr  = closes[closes.length - 1];
+  scores.sma20 = sma20 != null
+    ? Math.min(100, Math.max(0, 50 + ((curr - sma20) / sma20) * 500))
+    : 50;
+
+  // Price vs SMA50 (weight 10)
+  const sma50 = calcSMA(closes, 50);
+  scores.sma50 = sma50 != null
+    ? Math.min(100, Math.max(0, 50 + ((curr - sma50) / sma50) * 300))
+    : 50;
+
+  // Price vs SMA200 (weight 10)
+  const sma200 = calcSMA(closes, 200);
+  scores.sma200 = sma200 != null
+    ? Math.min(100, Math.max(0, 50 + ((curr - sma200) / sma200) * 200))
+    : 50;
+
+  // 52-week position (weight 10)
+  const pos52 = calc52WeekPosition(closes);
+  scores.week52 = pos52 != null ? pos52 * 100 : 50;
+
+  // Volume trend (weight 10)
+  scores.volume = calcVolumeScore(volumes);
+
+  // Weighted composite
+  const total =
+    scores.rsi    * 0.20 +
+    scores.macd   * 0.15 +
+    scores.adx    * 0.15 +
+    scores.sma20  * 0.10 +
+    scores.sma50  * 0.10 +
+    scores.sma200 * 0.10 +
+    scores.week52 * 0.10 +
+    scores.volume * 0.10;
+
+  const score = Math.round(total * 10) / 10;
+
+  let label;
+  if      (score >= 71) label = 'Technically Bullish';
+  else if (score >= 51) label = 'Technically Neutral';
+  else if (score >= 31) label = 'Technically Neutral';
+  else                  label = 'Technically Bearish';
+
+  return { score, label, components: scores };
+}
+
+// ── Route: GET /api/momentum/:symbol ─────────────────────────────────────────
+// Fetches 1yr daily OHLCV from Yahoo, calculates momentum score in-house
+// Replaces Trendlyne scrape — fully reliable on Railway
+// Server-cached 60 min (score is EOD)
+
+const momentumCache = {};
+const MOMENTUM_TTL  = 60 * 60 * 1000;
+
+app.get('/api/momentum/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  const now    = Date.now();
+
+  if (momentumCache[symbol] && (now - momentumCache[symbol].at) < MOMENTUM_TTL) {
+    return res.json(momentumCache[symbol].data);
+  }
+
+  const encoded = encodeURIComponent(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=2y`;
+
+  try {
+    const json  = await yfFetch(url);
+    const chart = json?.chart?.result?.[0];
+    if (!chart) return res.json({ error: true });
+
+    const q = chart.indicators?.quote?.[0];
+    if (!q) return res.json({ error: true });
+
+    // Build clean arrays (filter nulls)
+    const closes  = [], highs = [], lows = [], volumes = [];
+    const rawC = q.close || [], rawH = q.high || [], rawL = q.low || [], rawV = q.volume || [];
+
+    for (let i = 0; i < rawC.length; i++) {
+      if (rawC[i] != null && rawH[i] != null && rawL[i] != null) {
+        closes.push(rawC[i]);
+        highs.push(rawH[i]);
+        lows.push(rawL[i]);
+        volumes.push(rawV[i] || 0);
+      }
+    }
+
+    if (closes.length < 30) return res.json({ error: true });
+
+    const result = calcMomentumScore(closes, highs, lows, volumes);
+    const data = { ...result, source: 'Calculated · Yahoo Finance' };
+    momentumCache[symbol] = { data, at: now };
+    return res.json(data);
+  } catch (e) {
+    console.error(`[momentum] ${symbol}:`, e.message);
+    if (momentumCache[symbol]) return res.json(momentumCache[symbol].data);
+    return res.json({ error: true });
+  }
+});
+
 // ── News helpers ──────────────────────────────────────────────────────────────
 
 const rssParser = new RssParser({

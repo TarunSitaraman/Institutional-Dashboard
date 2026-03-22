@@ -53,12 +53,12 @@ async function fetchOHLC(symbol) {
   } catch (e) { return null; }
 }
 
-/* ── Fetch Trendlyne momentum ── */
+/* ── Fetch calculated momentum score ── */
 async function fetchMomentum(symbol) {
-  // symbol is like CHOLAFIN.NS → strip .NS for Trendlyne
-  var tl = symbol.replace(/\.NS$/i, '');
+  // symbol is bare NSE symbol e.g. CHOLAFIN — server fetches 2yr daily and calculates
+  var bare = symbol.replace(/\.NS$/i, '');
   try {
-    var res  = await fetch('/api/trendlyne/momentum/' + tl, { signal: AbortSignal.timeout(15000) });
+    var res  = await fetch('/api/momentum/' + bare + '.NS', { signal: AbortSignal.timeout(20000) });
     var json = await res.json();
     return json.error ? null : json;
   } catch (e) { return null; }
@@ -132,7 +132,7 @@ async function loadMomentumData() {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
   });
   var mEl = document.getElementById('momentum-timestamp-text');
-  if (mEl) mEl.textContent = 'Momentum + OHLC updated ' + ts + ' · Source: Trendlyne (EOD) · Yahoo Finance';
+  if (mEl) mEl.textContent = 'Momentum + OHLC updated ' + ts + ' · Calculated from 2yr daily data · Yahoo Finance';
 }
 
 /* ── Scheduling ── */
