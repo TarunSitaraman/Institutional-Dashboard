@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Institutional Dashboard — Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── LIGHT THEME (default) ── */
+    :root {
+      --bg:           #f5f4f0;
+      --bg-panel:     #ffffff;
+      --text-primary: #0c1220;
+      --text-subtle:  #6b7280;
+      --text-muted:   #9ca3af;
+      --accent-blue:  #002d62;
+      --accent-gold:  #c9a227;
+      --border:       #e2e0d8;
+      --input-bg:     #fafaf8;
+      --shadow:       0 8px 32px rgba(0,0,0,0.10);
+      --grid-color:   rgba(0,45,98,0.06);
+      --sans:         'IBM Plex Sans', sans-serif;
+      --mono:         'IBM Plex Mono', monospace;
+    }
+
+    /* ── DARK THEME ── */
+    html.dark {
+      --bg:           #1a1c1e;
+      --bg-panel:     #22252a;
+      --text-primary: #e8e6e0;
+      --text-subtle:  #9ba3b0;
+      --text-muted:   #6b7480;
+      --accent-blue:  #4d9fff;
+      --accent-gold:  #d4aa3a;
+      --border:       #2e3138;
+      --input-bg:     #1e2124;
+      --shadow:       0 8px 32px rgba(0,0,0,0.45);
+      --grid-color:   rgba(46,49,56,0.8);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--sans);
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.25s, color 0.25s;
+    }
+
+    /* ── GRID BACKGROUND ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+      transition: background-image 0.25s;
+    }
+
+    /* ── THEME TOGGLE ── */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-family: var(--sans);
+      color: var(--text-subtle);
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      user-select: none;
+    }
+    .theme-toggle:hover { color: var(--text-primary); }
+    .theme-toggle svg { width: 14px; height: 14px; fill: currentColor; flex-shrink: 0; }
+
+    /* ── PAGE LAYOUT ── */
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .hero-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+      margin-bottom: 12px;
+    }
+    .hero-title {
+      font-size: clamp(40px, 6vw, 64px);
+      font-weight: 700;
+      color: var(--accent-blue);
+      line-height: 1.05;
+      letter-spacing: -0.5px;
+    }
+    .hero-sub {
+      margin-top: 14px;
+      font-size: 14px;
+      color: var(--text-subtle);
+      max-width: 380px;
+      line-height: 1.6;
+    }
+
+    /* ── LOGIN CARD ── */
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow);
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .card-heading {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 13px;
+      color: var(--text-subtle);
+      margin-bottom: 28px;
+    }
+
+    /* ── FORM ── */
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: var(--mono);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.15s, background 0.2s;
+    }
+    .field input::placeholder { color: var(--text-muted); }
+    .field input:focus { border-color: var(--accent-blue); }
+
+    .field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .field-row label { margin-bottom: 0; }
+    .forgot {
+      font-size: 12px;
+      color: var(--accent-gold);
+      text-decoration: none;
+      font-family: var(--sans);
+    }
+    .forgot:hover { text-decoration: underline; }
+
+    .btn-primary {
+      width: 100%;
+      padding: 11px;
+      background: var(--accent-blue);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--sans);
+      cursor: pointer;
+      margin-top: 8px;
+      letter-spacing: 0.02em;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .create-link {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-subtle);
+    }
+    .create-link a {
+      color: var(--accent-gold);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .create-link a:hover { text-decoration: underline; }
+
+    /* ── FOOTER NOTE ── */
+    .footnote {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 380px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Theme toggle -->
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+    <svg id="theme-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <!-- Moon icon (shown in light mode) -->
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <span id="theme-label">Dark</span>
+  </button>
+
+  <div class="page">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-label">Institutional Dashboard</div>
+      <div class="hero-title">Market Intelligence</div>
+      <div class="hero-sub">Your personalized market terminal. Watchlists, pivot levels, and live data — customized for you.</div>
+    </div>
+
+    <!-- Login card -->
+    <div class="card">
+      <!-- LOGIN VIEW -->
+      <div id="view-login">
+        <div class="card-heading">Welcome back</div>
+        <div class="card-sub">Access your institutional trading suite.</div>
+        <form id="login-form">
+          <div class="field">
+            <label>Email Address</label>
+            <input id="login-email" type="email" placeholder="you@institution.com" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <div class="field-row">
+              <label>Password</label>
+            </div>
+            <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+          </div>
+          <div id="login-error" style="display:none; color:#e05c6a; font-size:13px; margin-top:6px;"></div>
+          <button class="btn-primary" type="submit" id="signin-btn">Sign In →</button>
+        </form>
+        <div class="divider">or</div>
+        <div class="create-link"><a href="#" id="show-register">Create Account</a></div>
+      </div>
+
+      <!-- REGISTER VIEW -->
+      <div id="view-register" style="display:none;">
+        <div class="card-heading">Create Account</div>
+        <div class="card-sub">Set up your personal market terminal.</div>
+        <form id="register-form">
+          <div class="field">
+            <label>Full Name</label>
+            <input id="reg-name" type="text" placeholder="Your name" autocomplete="name" required />
+          </div>
+          <div class="field">
+            <label>Email Address</label>
+            <input id="reg-email" type="email" placeholder="you@institution.com" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input id="reg-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password" required />
+          </div>
+          <div id="register-error" style="display:none; color:#e05c6a; font-size:13px; margin-top:6px;"></div>
+          <button class="btn-primary" type="submit" id="register-btn">Create Account →</button>
+        </form>
+        <div class="divider">or</div>
+        <div class="create-link"><a href="#" id="show-login">Back to Sign In</a></div>
+      </div>
+    </div>
+
+    <div class="footnote">Each account has its own watchlist, pivot levels, and layout preferences — managed by Institutional Dashboard.</div>
+  </div>
+
+  <script>
+    // ── View toggle ──
+    document.getElementById('show-register').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('view-login').style.display = 'none';
+      document.getElementById('view-register').style.display = 'block';
+    });
+    document.getElementById('show-login').addEventListener('click', function(e) {
+      e.preventDefault();
+      document.getElementById('view-register').style.display = 'none';
+      document.getElementById('view-login').style.display = 'block';
+    });
+
+    // ── Login form ──
+    document.getElementById('login-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('signin-btn');
+      var err = document.getElementById('login-error');
+      var email = document.getElementById('login-email').value.trim();
+      var password = document.getElementById('login-password').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      err.style.display = 'none';
+
+      try {
+        var res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        var data = await res.json();
+        if (data.ok) {
+          window.location.href = '/';
+        } else {
+          err.textContent = data.error || 'Invalid email or password.';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Sign In →';
+        }
+      } catch (e) {
+        err.textContent = 'Connection error. Is the server running?';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Sign In →';
+      }
+    });
+
+    // ── Register form ──
+    document.getElementById('register-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('register-btn');
+      var err = document.getElementById('register-error');
+      var name = document.getElementById('reg-name').value.trim();
+      var email = document.getElementById('reg-email').value.trim();
+      var password = document.getElementById('reg-password').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Creating account…';
+      err.style.display = 'none';
+
+      try {
+        var res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        });
+        var data = await res.json();
+        if (data.ok) {
+          window.location.href = '/';
+        } else {
+          err.textContent = data.error || 'Failed to create account.';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Create Account →';
+        }
+      } catch (e) {
+        err.textContent = 'Connection error. Is the server running?';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Create Account →';
+      }
+    });
+
+    // ── Theme toggle ──
+    (function () {
+      var html = document.documentElement;
+      var btn = document.getElementById('theme-toggle');
+      var icon = document.getElementById('theme-icon');
+      var label = document.getElementById('theme-label');
+
+      // Sun SVG path
+      var SUN = 'M12 2a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1zm0 16a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1zm10-6a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM4 12a1 1 0 0 1-1 1H2a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zm14.95-6.95a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zM7.17 16.83a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zM18.95 18.95a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 1 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41zM7.17 7.17a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 1 1 1.41-1.41l.71.71a1 1 0 0 1 0 1.41zM12 7a5 5 0 1 1 0 10A5 5 0 0 1 12 7z';
+      // Moon SVG path
+      var MOON = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z';
+
+      function applyTheme(dark) {
+        if (dark) {
+          html.classList.add('dark');
+          icon.innerHTML = '<path d="' + SUN + '"/>';
+          label.textContent = 'Light';
+        } else {
+          html.classList.remove('dark');
+          icon.innerHTML = '<path d="' + MOON + '"/>';
+          label.textContent = 'Dark';
+        }
+        localStorage.setItem('sn-theme', dark ? 'dark' : 'light');
+      }
+
+      // Load saved preference
+      var saved = localStorage.getItem('sn-theme');
+      applyTheme(saved === 'dark');
+
+      btn.addEventListener('click', function () {
+        applyTheme(!html.classList.contains('dark'));
+      });
+    })();
+  </script>
+</body>
+</html>
