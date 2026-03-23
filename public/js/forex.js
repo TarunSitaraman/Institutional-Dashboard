@@ -168,5 +168,4 @@ function removeForexPair(symbol) {
 /* ── Init ── */
 forexState = loadForexState();
 renderForexRows();
-refreshForex();
-setInterval(refreshForex, 2000);
+refreshForex(); // initial load; subsequent refreshes driven by market.js interval

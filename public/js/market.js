@@ -176,6 +176,10 @@ async function refreshMarketData() {
 
   // Commodities handled by commodities.js
 
+  // Forex + Commodities — called here so all data refreshes on the same 2s tick
+  if (typeof refreshForex === 'function') refreshForex();
+  if (typeof refreshCommodities === 'function') refreshCommodities();
+
   // Timestamp
   var ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   var el = document.getElementById('last-update-time');

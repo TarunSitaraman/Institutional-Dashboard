@@ -169,5 +169,4 @@ function removeCommItem(symbol) {
 /* ── Init ── */
 commState = loadCommState();
 renderCommodities();
-refreshCommodities();
-setInterval(refreshCommodities, 2000);
+refreshCommodities(); // initial load; subsequent refreshes driven by market.js interval
