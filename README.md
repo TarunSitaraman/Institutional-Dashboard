@@ -1,6 +1,21 @@
 # Institutional Dashboard
 
+> **Work in Progress** — This project is actively being developed and is not production-ready. Data values may not reflect real-time market prices with full accuracy. Use for reference and testing purposes only, not for trading decisions.
+
 A personal market intelligence terminal built for institutional-grade trading data. Displays live Indian and US market prices, standard pivot levels, in-house momentum scores, and a curated financial news feed — with per-user accounts and customisable watchlists stored in Supabase.
+
+---
+
+## Disclaimer
+
+This dashboard is a personal side project currently in testing. Data accuracy is limited by the free APIs used:
+
+- **NSE India data** may lag by several seconds due to API caching
+- **US futures, Sensex, forex, and commodities** are sourced from Yahoo Finance's unofficial API which carries a **~15 minute delay**
+- **Momentum scores** are calculated in-house from end-of-day data and are approximations — not identical to any commercial data provider
+- **News** is sourced from public RSS feeds and may not reflect breaking developments instantly
+
+Do not use this dashboard for live trading decisions. Always verify prices with your broker or an official exchange feed.
 
 ---
 
