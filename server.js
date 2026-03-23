@@ -263,10 +263,19 @@ app.get('/api/quote/:symbol', async (req, res) => {
   }
 });
 
+// ── NSE server-side cache (15s TTL) ───────────────────────────────────────────
+// Prevents hammering NSE on every 2s client refresh — NSE updates every ~5-15s
+const nseCache = { indices: null, giftnifty: null };
+const NSE_TTL  = 15 * 1000;
+
 // ── Route: GET /api/nse/indices ───────────────────────────────────────────────
 // NSE India official allIndices — Nifty 50, Bank Nifty (authoritative, no delay)
 // Returns { nifty50: {price, changePct, open, high, low, prev}, niftyBank: {...} }
 app.get('/api/nse/indices', async (req, res) => {
+  const now = Date.now();
+  if (nseCache.indices && (now - nseCache.indices.at) < NSE_TTL) {
+    return res.json(nseCache.indices.data);
+  }
   try {
     const json = await nseFetch('https://www.nseindia.com/api/allIndices');
     const data = json?.data || [];
@@ -286,13 +295,16 @@ app.get('/api/nse/indices', async (req, res) => {
       };
     };
 
-    return res.json({
+    const result = {
       nifty50:   pick('NIFTY 50'),
       niftyBank: pick('NIFTY BANK'),
       indiavix:  pick('INDIA VIX'),
-    });
+    };
+    nseCache.indices = { data: result, at: now };
+    return res.json(result);
   } catch (e) {
     console.error('[nse/indices]:', e.message);
+    if (nseCache.indices) return res.json(nseCache.indices.data); // serve stale on error
     return res.json({ error: true });
   }
 });
@@ -301,21 +313,28 @@ app.get('/api/nse/indices', async (req, res) => {
 // NSE India official Gift Nifty futures price (from marketStatus)
 // Returns { price, changePct, expiry, timestamp, source }
 app.get('/api/nse/giftnifty', async (req, res) => {
+  const now = Date.now();
+  if (nseCache.giftnifty && (now - nseCache.giftnifty.at) < NSE_TTL) {
+    return res.json(nseCache.giftnifty.data);
+  }
   try {
     const json = await nseFetch('https://www.nseindia.com/api/marketStatus');
     const gn   = json?.giftnifty;
     if (!gn || !gn.LASTPRICE) { console.warn('[nse/giftnifty] No data'); return res.json({ error: true }); }
 
-    return res.json({
+    const result = {
       price:     gn.LASTPRICE,
       changePct: gn.PERCHANGE / 100,
       change:    gn.DAYCHANGE,
       expiry:    gn.EXPIRYDATE,
       timestamp: gn.TIMESTMP,
       source:    'NSE India (GIFT City)',
-    });
+    };
+    nseCache.giftnifty = { data: result, at: now };
+    return res.json(result);
   } catch (e) {
     console.error('[nse/giftnifty]:', e.message);
+    if (nseCache.giftnifty) return res.json(nseCache.giftnifty.data); // serve stale on error
     return res.json({ error: true });
   }
 });
