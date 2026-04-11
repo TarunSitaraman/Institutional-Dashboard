@@ -2,16 +2,16 @@
 
 require('dotenv').config();
 
-const express      = require('express');
-const fetch        = require('node-fetch');
-const path         = require('path');
-const RssParser    = require('rss-parser');
+const express = require('express');
+const fetch = require('node-fetch');
+const path = require('path');
+const RssParser = require('rss-parser');
 const cookieParser = require('cookie-parser');
-const crypto       = require('crypto');
-const bcrypt       = require('bcrypt');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const { createClient } = require('@supabase/supabase-js');
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
@@ -26,7 +26,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 async function createSession(userId) {
-  const token     = crypto.randomBytes(32).toString('hex');
+  const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
   await db.from('sessions').insert({ token, user_id: userId, expires_at: expiresAt });
   return token;
@@ -73,10 +73,14 @@ app.post('/api/auth/register', async (req, res) => {
     .insert({ email: emailLower, password_hash: passwordHash, name })
     .select('id')
     .single();
-  if (error) return res.status(500).json({ error: 'Failed to create account.' });
+  if (error) {
+    console.error('Register insert error:', error);
+    return res.status(500).json({ error: 'Failed to create account: ' + error.message });
+  }
 
   // Create default settings row
-  await db.from('user_settings').insert({ user_id: user.id });
+  const { error: settingsError } = await db.from('user_settings').insert({ user_id: user.id });
+  if (settingsError) console.error('Settings insert error:', settingsError);
 
   const token = await createSession(user.id);
   res.cookie('sn-session', token, { httpOnly: true, sameSite: 'lax', maxAge: SESSION_TTL_MS });
@@ -88,12 +92,15 @@ app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
-  const { data: user } = await db
+  const { data: user, error } = await db
     .from('users')
     .select('id, name, password_hash')
     .eq('email', email.toLowerCase().trim())
     .single();
-  if (!user) return res.status(401).json({ error: 'Invalid email or password.' });
+  if (error) {
+    console.error('Login db error:', error);
+  }
+  if (!user) return res.status(401).json({ error: 'Invalid email or password. ' + (error ? error.message : '') });
 
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: 'Invalid email or password.' });
@@ -158,32 +165,32 @@ async function getYFSession(force = false) {
   if (yfSessionPending) return yfSessionPending;
 
   yfSessionPending = (async () => {
-  try {
-    // Step 1: hit the consent / main page to get a cookie
-    const cookieRes = await fetch('https://fc.yahoo.com', {
-      headers: { 'User-Agent': BROWSER_UA, 'Accept': '*/*' },
-      redirect: 'follow',
-    });
-    const rawCookies = cookieRes.headers.raw()['set-cookie'] || [];
-    const cookie = rawCookies.map(c => c.split(';')[0]).join('; ');
+    try {
+      // Step 1: hit the consent / main page to get a cookie
+      const cookieRes = await fetch('https://fc.yahoo.com', {
+        headers: { 'User-Agent': BROWSER_UA, 'Accept': '*/*' },
+        redirect: 'follow',
+      });
+      const rawCookies = cookieRes.headers.raw()['set-cookie'] || [];
+      const cookie = rawCookies.map(c => c.split(';')[0]).join('; ');
 
-    // Step 2: exchange cookie for a crumb
-    const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      headers: { 'User-Agent': BROWSER_UA, 'Cookie': cookie, 'Accept': '*/*' },
-    });
-    const crumb = (await crumbRes.text()).trim();
-    if (!crumb || crumb.includes('<')) throw new Error('bad crumb: ' + crumb.slice(0, 40));
+      // Step 2: exchange cookie for a crumb
+      const crumbRes = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+        headers: { 'User-Agent': BROWSER_UA, 'Cookie': cookie, 'Accept': '*/*' },
+      });
+      const crumb = (await crumbRes.text()).trim();
+      if (!crumb || crumb.includes('<')) throw new Error('bad crumb: ' + crumb.slice(0, 40));
 
-    yfSession = { cookie, crumb, at: now };
-    console.log('[yf] session refreshed, crumb:', crumb);
-    return yfSession;
-  } catch (e) {
-    console.warn('[yf] session refresh failed:', e.message, '— proceeding without crumb');
-    yfSession = { cookie: '', crumb: '', at: now };
-    return yfSession;
-  } finally {
-    yfSessionPending = null;
-  }
+      yfSession = { cookie, crumb, at: now };
+      console.log('[yf] session refreshed, crumb:', crumb);
+      return yfSession;
+    } catch (e) {
+      console.warn('[yf] session refresh failed:', e.message, '— proceeding without crumb');
+      yfSession = { cookie: '', crumb: '', at: now };
+      return yfSession;
+    } finally {
+      yfSessionPending = null;
+    }
   })();
   return yfSessionPending;
 }
@@ -243,19 +250,19 @@ function nseFetch(url) {
 // Yahoo Finance v8 chart — US futures, Sensex, USD-INR, commodities
 // Returns { price, changePct, source }
 app.get('/api/quote/:symbol', async (req, res) => {
-  const symbol  = req.params.symbol;
+  const symbol = req.params.symbol;
   const encoded = encodeURIComponent(symbol);
-  const url     = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1m&range=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1m&range=1d`;
 
   try {
     const json = await yfFetch(url);
     const meta = json?.chart?.result?.[0]?.meta;
     if (!meta) { console.warn(`[yf/quote] No meta for ${symbol}`); return res.json({ error: true }); }
 
-    const price     = meta.regularMarketPrice;
-    const prev      = meta.previousClose || meta.chartPreviousClose;
+    const price = meta.regularMarketPrice;
+    const prev = meta.previousClose || meta.chartPreviousClose;
     const changePct = (prev && prev !== 0) ? (price - prev) / prev : null;
-    const change    = (prev != null) ? (price - prev) : null;
+    const change = (prev != null) ? (price - prev) : null;
     return res.json({ price, change, changePct, source: 'Yahoo Finance' });
   } catch (e) {
     console.error(`[yf/quote] ${symbol}:`, e.message);
@@ -266,7 +273,7 @@ app.get('/api/quote/:symbol', async (req, res) => {
 // ── NSE server-side cache (15s TTL) ───────────────────────────────────────────
 // Prevents hammering NSE on every 2s client refresh — NSE updates every ~5-15s
 const nseCache = { indices: null, giftnifty: null };
-const NSE_TTL  = 15 * 1000;
+const NSE_TTL = 15 * 1000;
 
 // ── Route: GET /api/nse/indices ───────────────────────────────────────────────
 // NSE India official allIndices — Nifty 50, Bank Nifty (authoritative, no delay)
@@ -284,21 +291,21 @@ app.get('/api/nse/indices', async (req, res) => {
       const item = data.find(x => x.indexSymbol === name);
       if (!item) return null;
       return {
-        price:     item.last,
-        change:    item.last - item.previousClose,
+        price: item.last,
+        change: item.last - item.previousClose,
         changePct: item.percentChange / 100,
-        open:      item.open,
-        high:      item.high,
-        low:       item.low,
-        prev:      item.previousClose,
-        source:    'NSE India',
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        prev: item.previousClose,
+        source: 'NSE India',
       };
     };
 
     const result = {
-      nifty50:   pick('NIFTY 50'),
+      nifty50: pick('NIFTY 50'),
       niftyBank: pick('NIFTY BANK'),
-      indiavix:  pick('INDIA VIX'),
+      indiavix: pick('INDIA VIX'),
     };
     nseCache.indices = { data: result, at: now };
     return res.json(result);
@@ -319,16 +326,16 @@ app.get('/api/nse/giftnifty', async (req, res) => {
   }
   try {
     const json = await nseFetch('https://www.nseindia.com/api/marketStatus');
-    const gn   = json?.giftnifty;
+    const gn = json?.giftnifty;
     if (!gn || !gn.LASTPRICE) { console.warn('[nse/giftnifty] No data'); return res.json({ error: true }); }
 
     const result = {
-      price:     gn.LASTPRICE,
+      price: gn.LASTPRICE,
       changePct: gn.PERCHANGE / 100,
-      change:    gn.DAYCHANGE,
-      expiry:    gn.EXPIRYDATE,
+      change: gn.DAYCHANGE,
+      expiry: gn.EXPIRYDATE,
       timestamp: gn.TIMESTMP,
-      source:    'NSE India (GIFT City)',
+      source: 'NSE India (GIFT City)',
     };
     nseCache.giftnifty = { data: result, at: now };
     return res.json(result);
@@ -343,17 +350,17 @@ app.get('/api/nse/giftnifty', async (req, res) => {
 // Yahoo Finance daily OHLC for pivot level calculations
 // Returns { H, L, C } of most recent complete trading day
 app.get('/api/ohlc/:symbol', async (req, res) => {
-  const symbol  = req.params.symbol;
+  const symbol = req.params.symbol;
   const encoded = encodeURIComponent(symbol);
-  const url     = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`;
 
   try {
-    const json  = await yfFetch(url);
+    const json = await yfFetch(url);
     const chart = json?.chart?.result?.[0];
     if (!chart) { console.warn(`[ohlc] No chart for ${symbol}`); return res.json({ error: true }); }
 
     const quotes = chart.indicators?.quote?.[0];
-    const ts     = chart.timestamp || [];
+    const ts = chart.timestamp || [];
 
     if (!quotes || ts.length < 1) { return res.json({ error: true }); }
 
@@ -434,10 +441,10 @@ function calcADX(highs, lows, closes, period = 14) {
     dmMinus.push(Math.max(lows[i - 1] - lows[i], 0) > Math.max(highs[i] - highs[i - 1], 0)
       ? Math.max(lows[i - 1] - lows[i], 0) : 0);
   }
-  const atr  = trueRanges.slice(-period).reduce((a, b) => a + b, 0) / period;
-  const pDI  = (dmPlus.slice(-period).reduce((a, b) => a + b, 0) / period) / atr * 100;
-  const mDI  = (dmMinus.slice(-period).reduce((a, b) => a + b, 0) / period) / atr * 100;
-  const dx   = Math.abs(pDI - mDI) / (pDI + mDI) * 100;
+  const atr = trueRanges.slice(-period).reduce((a, b) => a + b, 0) / period;
+  const pDI = (dmPlus.slice(-period).reduce((a, b) => a + b, 0) / period) / atr * 100;
+  const mDI = (dmMinus.slice(-period).reduce((a, b) => a + b, 0) / period) / atr * 100;
+  const dx = Math.abs(pDI - mDI) / (pDI + mDI) * 100;
   return { adx: dx, pdi: pDI, mdi: mDI };
 }
 
@@ -445,8 +452,8 @@ function calc52WeekPosition(closes) {
   if (closes.length < 52) return null;
   const slice = closes.slice(-252);
   const high52 = Math.max(...slice);
-  const low52  = Math.min(...slice);
-  const curr   = closes[closes.length - 1];
+  const low52 = Math.min(...slice);
+  const curr = closes[closes.length - 1];
   return (curr - low52) / (high52 - low52); // 0 = at 52wk low, 1 = at 52wk high
 }
 
@@ -514,11 +521,11 @@ function calcMomentumScore(closes, highs, lows, volumes) {
 
   // Weighted composite
   const total =
-    scores.rsi    * 0.20 +
-    scores.macd   * 0.15 +
-    scores.adx    * 0.15 +
-    scores.sma20  * 0.10 +
-    scores.sma50  * 0.10 +
+    scores.rsi * 0.20 +
+    scores.macd * 0.15 +
+    scores.adx * 0.15 +
+    scores.sma20 * 0.10 +
+    scores.sma50 * 0.10 +
     scores.sma200 * 0.10 +
     scores.week52 * 0.10 +
     scores.volume * 0.10;
@@ -529,9 +536,9 @@ function calcMomentumScore(closes, highs, lows, volumes) {
   const score = Math.round(compressed * 10) / 10;
 
   let label;
-  if      (score >= 55) label = 'Technically Bullish';
+  if (score >= 55) label = 'Technically Bullish';
   else if (score >= 38) label = 'Technically Neutral';
-  else                  label = 'Technically Bearish';
+  else label = 'Technically Bearish';
 
   return { score, label, components: scores };
 }
@@ -542,11 +549,11 @@ function calcMomentumScore(closes, highs, lows, volumes) {
 // Server-cached 60 min (score is EOD)
 
 const momentumCache = {};
-const MOMENTUM_TTL  = 60 * 60 * 1000;
+const MOMENTUM_TTL = 60 * 60 * 1000;
 
 app.get('/api/momentum/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const now    = Date.now();
+  const now = Date.now();
 
   if (momentumCache[symbol] && (now - momentumCache[symbol].at) < MOMENTUM_TTL) {
     return res.json(momentumCache[symbol].data);
@@ -556,7 +563,7 @@ app.get('/api/momentum/:symbol', async (req, res) => {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=2y`;
 
   try {
-    const json  = await yfFetch(url);
+    const json = await yfFetch(url);
     const chart = json?.chart?.result?.[0];
     if (!chart) return res.json({ error: true });
 
@@ -564,7 +571,7 @@ app.get('/api/momentum/:symbol', async (req, res) => {
     if (!q) return res.json({ error: true });
 
     // Build clean arrays (filter nulls)
-    const closes  = [], highs = [], lows = [], volumes = [];
+    const closes = [], highs = [], lows = [], volumes = [];
     const rawC = q.close || [], rawH = q.high || [], rawL = q.low || [], rawV = q.volume || [];
 
     for (let i = 0; i < rawC.length; i++) {
@@ -598,13 +605,13 @@ const rssParser = new RssParser({
 
 // Keyword → category mapping (checked against title)
 const NEWS_RULES = [
-  { pattern: /\b(nifty\s*50|nifty\s+bank|bank\s*nifty|sensex|bse|nse|nifty|gift\s*nifty|sgx\s*nifty)\b/i,  category: 'India'      },
-  { pattern: /\b(crude|brent|wti|opec|oil\s+price|petroleum|energy)\b/i,                                     category: 'Energy'     },
-  { pattern: /\b(s&p|nasdaq|dow|nyse|federal\s*reserve|fed\s*rate|us\s+market|wall\s+street|futures)\b/i,    category: 'US Markets' },
-  { pattern: /\b(rupee|usd.?inr|dollar.?rupee|rbi|forex|exchange\s+rate|currency)\b/i,                       category: 'Forex'      },
-  { pattern: /\b(inflation|cpi|gdp|fiscal|monetary|budget|interest\s+rate|rbi|economy)\b/i,                  category: 'Macro'      },
-  { pattern: /\b(gold|silver|commodity|commodities|metal)\b/i,                                               category: 'Commodities'},
-  { pattern: /\b(ipo|fii|dii|fpi|block\s+deal|stock|equity|earnings|results|quarter)\b/i,                   category: 'Equities'   },
+  { pattern: /\b(nifty\s*50|nifty\s+bank|bank\s*nifty|sensex|bse|nse|nifty|gift\s*nifty|sgx\s*nifty)\b/i, category: 'India' },
+  { pattern: /\b(crude|brent|wti|opec|oil\s+price|petroleum|energy)\b/i, category: 'Energy' },
+  { pattern: /\b(s&p|nasdaq|dow|nyse|federal\s*reserve|fed\s*rate|us\s+market|wall\s+street|futures)\b/i, category: 'US Markets' },
+  { pattern: /\b(rupee|usd.?inr|dollar.?rupee|rbi|forex|exchange\s+rate|currency)\b/i, category: 'Forex' },
+  { pattern: /\b(inflation|cpi|gdp|fiscal|monetary|budget|interest\s+rate|rbi|economy)\b/i, category: 'Macro' },
+  { pattern: /\b(gold|silver|commodity|commodities|metal)\b/i, category: 'Commodities' },
+  { pattern: /\b(ipo|fii|dii|fpi|block\s+deal|stock|equity|earnings|results|quarter)\b/i, category: 'Equities' },
 ];
 
 function categorise(title) {
@@ -616,16 +623,16 @@ function categorise(title) {
 
 // RSS feeds — no API key, server-side only (no CORS)
 const RSS_FEEDS = [
-  { url: 'https://www.livemint.com/rss/news',                                     source: 'Mint'           },
-  { url: 'https://www.livemint.com/rss/markets',                                  source: 'Mint Markets'   },
-  { url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',  source: 'ET Markets'     },
-  { url: 'https://pulse.zerodha.com/feed.xml',                                    source: 'Zerodha Pulse'  },
+  { url: 'https://www.livemint.com/rss/news', source: 'Mint' },
+  { url: 'https://www.livemint.com/rss/markets', source: 'Mint Markets' },
+  { url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms', source: 'ET Markets' },
+  { url: 'https://pulse.zerodha.com/feed.xml', source: 'Zerodha Pulse' },
 ];
 
 // Simple in-memory cache so RSS isn't hammered on every client refresh
-let newsCache   = [];
+let newsCache = [];
 let newsCacheAt = 0;
-const NEWS_TTL  = 2 * 60 * 1000; // 2 minutes
+const NEWS_TTL = 2 * 60 * 1000; // 2 minutes
 
 // Topics that are off-dashboard — filter these out from general feeds
 const OFF_TOPIC = /\b(cricket|football|ipl|bollywood|film|movie|election|politics|parliament|covid|cancer|health|recipe|fashion|lifestyle|travel|science|space|nasa|climate|weather|education|school|college|exam|sports|olympic|tennis|badminton|golf|hockey|wrestling|army|military|war|conflict|ukraine|israel|china|pakistan|trump|modi|bjp|congress|aam\s*aadmi)\b/i;
@@ -635,7 +642,7 @@ async function fetchAllNews() {
     RSS_FEEDS.map(f => rssParser.parseURL(f.url).then(feed => ({ feed, source: f.source })))
   );
 
-  const seen     = new Set();
+  const seen = new Set();
   const articles = [];
 
   results.forEach(r => {
@@ -643,7 +650,7 @@ async function fetchAllNews() {
     const { feed, source } = r.value;
     (feed.items || []).forEach(item => {
       const title = (item.title || '').trim();
-      const link  = item.link || item.guid || '';
+      const link = item.link || item.guid || '';
       if (!title || !link || seen.has(link)) return;
 
       // Skip off-topic articles from general feeds
@@ -652,12 +659,12 @@ async function fetchAllNews() {
       seen.add(link);
 
       const pubDate = item.pubDate || item.isoDate || '';
-      const ts      = pubDate ? Math.floor(new Date(pubDate).getTime() / 1000) : 0;
+      const ts = pubDate ? Math.floor(new Date(pubDate).getTime() / 1000) : 0;
       const category = categorise(title);
 
       articles.push({
         title,
-        publisher:   source,
+        publisher: source,
         link,
         publishedAt: ts,
         category,
@@ -679,7 +686,7 @@ const TL_TTL = 15 * 60 * 1000;
 
 app.get('/api/trendlyne/momentum/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const now    = Date.now();
+  const now = Date.now();
 
   if (trendlyneCache[symbol] && (now - trendlyneCache[symbol].at) < TL_TTL) {
     return res.json(trendlyneCache[symbol].data);
@@ -712,8 +719,8 @@ app.get('/api/trendlyne/momentum/:symbol', async (req, res) => {
     if (!scoreMatch) throw new Error('score not found');
 
     const data = {
-      score:  parseFloat(scoreMatch[1]),
-      label:  labelMatch ? labelMatch[1].trim() : null,
+      score: parseFloat(scoreMatch[1]),
+      label: labelMatch ? labelMatch[1].trim() : null,
       source: 'Trendlyne',
     };
     trendlyneCache[symbol] = { data, at: now };
@@ -754,7 +761,7 @@ app.get('/api/news', async (req, res) => {
     }
     const articles = await fetchAllNews();
     if (articles.length > 0) {
-      newsCache   = articles;
+      newsCache = articles;
       newsCacheAt = now;
     }
     return res.json(newsCache);
@@ -766,7 +773,7 @@ app.get('/api/news', async (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 // Warm Yahoo Finance session before first client request
-getYFSession().catch(() => {});
+getYFSession().catch(() => { });
 
 app.listen(PORT, () => {
   console.log(`\nSN Institutional Terminal → http://localhost:${PORT}\n`);
